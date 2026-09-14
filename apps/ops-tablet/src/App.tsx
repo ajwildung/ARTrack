@@ -94,6 +94,7 @@ export default function App() {
           <span className="pill phase">PHASE {snap.phase}</span>
           <span className="pill vis">VISUAL ONLY</span>
           <span className="pill loc">LOC {snap.localization.provider.toUpperCase()}</span>
+          <span className="pill vis">QUEST LAB</span>
           <span className={`pill gate ${phase0?.gate === "PASS" ? "ok" : ""}`}>
             GATE {phase0?.gate ?? "…"} · phys {phase0?.emittedPhysicalOffsets ?? "–"}
           </span>
@@ -109,7 +110,7 @@ export default function App() {
           <div className="state-label">SESSION</div>
           <div className="state">{headline}</div>
           <div className="muted tiny">
-            {snap.karts.length} karts · {snap.pads.length} pads · {snap.pickups.length} pickups live · actuators absent
+            {snap.karts.length} karts · {(snap.headsets ?? []).length} headset · {snap.pads.length} pads · {snap.pickups.length} pickups live · actuators absent
           </div>
         </div>
       </section>
@@ -146,11 +147,11 @@ function Lobby({ snap }: { snap: SessionSnapshot }) {
     <main className="panel">
       <h2>Lobby</h2>
       <p className="muted">
-        Race-only M1: Sprint Heat. Soft-visual pads + pickups. No CAN torque / motor overlay. Localization is a track-local
-        stub.
+        Race-only Sprint Heat. Soft-visual pads + pickups. Lab visor is Quest passthrough (world-locked FX). No CAN
+        torque / motor overlay. Localization: stub → dual-pose fusion (KartVio + HMD SLAM).
       </p>
       <KartTable snap={snap} />
-      {snap.karts.length === 0 && <p className="empty">No karts yet — open the HUD or seed sims.</p>}
+        {snap.karts.length === 0 && <p className="empty">No karts yet — open /quest, /hud, or seed sims.</p>}
     </main>
   );
 }
@@ -230,7 +231,9 @@ function KartTable({ snap }: { snap: SessionSnapshot }) {
           <th>Laps</th>
           <th>Speed</th>
           <th>Inv</th>
-          <th>Surge</th>
+            <th>World FX</th>
+            <th>Headset</th>
+            <th>Surge</th>
         </tr>
       </thead>
       <tbody>
@@ -248,6 +251,8 @@ function KartTable({ snap }: { snap: SessionSnapshot }) {
             <td>
               D{k.inventory.defensive} P{k.inventory.pace}
             </td>
+            <td>{k.worldFxAllowed ? "ON" : k.hideReason ?? "off"}</td>
+            <td>{k.headsetConnected ? k.lookSource : "—"}</td>
             <td>{k.surgeUntil > snap.serverNow ? "VIS" : "—"}</td>
           </tr>
         ))}

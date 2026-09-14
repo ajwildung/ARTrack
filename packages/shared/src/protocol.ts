@@ -1,8 +1,9 @@
 import type { LocalizationProvider } from "./rules.ts";
 import type { TrackLayout } from "./track.ts";
+import type { CompositorPublic, DualPoseSample, FusedLocalization, LocalizationPublic, Pose3 } from "./compositor.ts";
 
 export type SessionStatus = "lobby" | "live" | "results";
-export type ClientRole = "ops" | "hud" | "kart";
+export type ClientRole = "ops" | "hud" | "kart" | "headset" | "kart_cam";
 export type PickupKind = "defensive" | "pace";
 export type VfxType =
   | "surge"
@@ -42,6 +43,13 @@ export interface KartPublic {
   padCooldownUntil: number;
   inventory: { defensive: number; pace: number };
   locProvider: LocalizationProvider;
+  locQuality: number;
+  worldPoseHealthy: boolean;
+  worldFxAllowed: boolean;
+  lookSource: "none" | "sim" | "helmet_vio" | "hmd_slam";
+  headsetConnected: boolean;
+  kartCamConnected: boolean;
+  hideReason: string | null;
 }
 
 export interface PadState {
@@ -94,7 +102,9 @@ export interface SessionSnapshot {
   startedAt: number | null;
   endsAt: number | null;
   serverNow: number;
-  localization: { provider: LocalizationProvider; frame: "track_local"; note: string };
+  localization: LocalizationPublic;
+  compositor: CompositorPublic;
+  headsets: Array<{ kartId: string; lookSource: FusedLocalization["lookSource"]; worldFxAllowed: boolean }>;
   disabled: readonly string[];
   track: TrackLayout;
   karts: KartPublic[];
@@ -133,6 +143,8 @@ export type ClientMessage =
   | { type: "hello"; role: ClientRole; kartId?: string; name?: string }
   | { type: "ops"; action: "start" | "abort" | "safe_mode" | "seed_sims" | "reset" }
   | { type: "pose"; pose: Pose }
+  | { type: "dual_pose"; sample: DualPoseSample }
+  | { type: "hmd_pose"; kartId: string; pose: Pose3 }
   | { type: "steer"; kartId: string; throttle: number; steer: number }
   | { type: "use_pickup"; kartId: string; slot: PickupKind };
 

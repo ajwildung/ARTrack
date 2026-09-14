@@ -8,6 +8,7 @@ import type { Hub } from "./hub.ts";
 import type { Db } from "./db.ts";
 import type { Config } from "./config.ts";
 import { forbiddenHits } from "./assist.ts";
+import { DISPLAY } from "@voltage/shared";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "../../..");
@@ -29,6 +30,9 @@ export function createHttp(cfg: Config, session: SessionOrchestrator, hub: Hub, 
       platform: snap.platform,
       status: snap.status,
       localization: snap.localization,
+      compositor: snap.compositor,
+      display: DISPLAY,
+      headsets: snap.headsets,
       disabled: snap.disabled,
     });
   });
@@ -50,6 +54,28 @@ export function createHttp(cfg: Config, session: SessionOrchestrator, hub: Hub, 
   app.get("/api/audit/phase0", (req, res) => {
     const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : undefined;
     res.json(db.phase0Report(sessionId));
+  });
+
+  app.get("/api/compositor", (_req, res) => {
+    const snap = session.snapshot();
+    res.json({
+      phase: snap.phase,
+      physicalAssistEnabled: false,
+      compositor: snap.compositor,
+      localization: snap.localization,
+      headsets: snap.headsets,
+      karts: snap.karts.map((k) => ({
+        id: k.id,
+        locProvider: k.locProvider,
+        locQuality: k.locQuality,
+        worldPoseHealthy: k.worldPoseHealthy,
+        worldFxAllowed: k.worldFxAllowed,
+        lookSource: k.lookSource,
+        headsetConnected: k.headsetConnected,
+        kartCamConnected: k.kartCamConnected,
+        hideReason: k.hideReason,
+      })),
+    });
   });
 
   app.post("/api/ops/:action", (req, res) => {
@@ -83,6 +109,7 @@ export function createHttp(cfg: Config, session: SessionOrchestrator, hub: Hub, 
 
   const opsDist = join(repoRoot, "apps/ops-tablet/dist");
   const hudDist = join(repoRoot, "apps/hud-client/dist");
+  const questDist = join(repoRoot, "apps/quest-compositor/dist");
   if (existsSync(opsDist)) {
     app.use("/ops", express.static(opsDist));
     app.use("/ops", (_req, res) => res.sendFile(join(opsDist, "index.html")));
@@ -91,13 +118,18 @@ export function createHttp(cfg: Config, session: SessionOrchestrator, hub: Hub, 
     app.use("/hud", express.static(hudDist));
     app.use("/hud", (_req, res) => res.sendFile(join(hudDist, "index.html")));
   }
+  if (existsSync(questDist)) {
+    app.use("/quest", express.static(questDist));
+    app.use("/quest", (_req, res) => res.sendFile(join(questDist, "index.html")));
+  }
   app.get("/", (_req, res) => {
     if (existsSync(opsDist)) return res.redirect("/ops");
     res.type("html").send(
       `<html><body style="background:#07080c;color:#e7f3ff;font-family:sans-serif;padding:24px">
-       <h1>Voltage League M1</h1>
+       <h1>Voltage League M2</h1>
        <p>Build frontends with <code>npm run build</code> or run <code>npm run dev</code>.</p>
-       <p><a href="/api/health">/api/health</a> · <a href="/api/audit/phase0">/api/audit/phase0</a></p>
+       <p><a href="/ops">/ops</a> · <a href="/hud">/hud</a> (track map) · <a href="/quest">/quest</a> (Quest lab compositor)</p>
+       <p><a href="/api/health">/api/health</a> · <a href="/api/audit/phase0">/api/audit/phase0</a> · <a href="/api/compositor">/api/compositor</a></p>
        </body></html>`,
     );
   });

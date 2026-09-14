@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouse, type PointerEvent } from "react";
-import type { AssistRecord, KartPublic, SessionSnapshot } from "@voltage/shared";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { AssistRecord, DualPoseSample, KartPublic, SessionSnapshot } from "@voltage/shared";
 import { insidePad, RULES } from "@voltage/shared";
-import { TrackView } from "./TrackView";
+import { PassthroughView } from "./PassthroughView";
 
 function wsUrl(): string {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
@@ -9,8 +9,7 @@ function wsUrl(): string {
 }
 
 function kartIdFromQuery(): string {
-  const q = new URLSearchParams(location.search).get("kart");
-  return q || "HUD-1";
+  return new URLSearchParams(location.search).get("kart") || "QUEST-1";
 }
 
 export default function App() {
@@ -18,9 +17,15 @@ export default function App() {
   const [snap, setSnap] = useState<SessionSnapshot | null>(null);
   const [assist, setAssist] = useState<AssistRecord | null>(null);
   const [predict, setPredict] = useState<{ until: number; source: "predict" | "auth" } | null>(null);
+  const [lookYaw, setLookYaw] = useState(0);
+  const [lookPitch, setLookPitch] = useState(-0.08);
+  const [unhealthy, setUnhealthy] = useState(false);
+  const [lookSource, setLookSource] = useState<"hmd_slam" | "helmet_vio">("hmd_slam");
   const keys = useRef({ up: false, down: false, left: false, right: false });
+  const look = useRef({ yaw: 0, pitch: -0.08 });
   const wsRef = useRef<WebSocket | null>(null);
   const lastPad = useRef<string | null>(null);
+  const dragging = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -28,7 +33,7 @@ export default function App() {
       const ws = new WebSocket(wsUrl());
       wsRef.current = ws;
       ws.onopen = () =>
-        ws.send(JSON.stringify({ type: "hello", role: "hud", kartId, name: `Helmet ${kartId}` }));
+        ws.send(JSON.stringify({ type: "hello", role: "headset", kartId, name: `Quest ${kartId}` }));
       ws.onmessage = (ev) => {
         const msg = JSON.parse(String(ev.data));
         if (msg.type === "hello_ok" || msg.type === "snapshot") setSnap(msg.snapshot);
@@ -57,6 +62,7 @@ export default function App() {
       if (e.code === "ArrowRight" || e.code === "KeyD") keys.current.right = true;
       if (e.code === "KeyQ") wsRef.current?.send(JSON.stringify({ type: "use_pickup", kartId, slot: "defensive" }));
       if (e.code === "KeyE") wsRef.current?.send(JSON.stringify({ type: "use_pickup", kartId, slot: "pace" }));
+      if (e.code === "KeyH") setUnhealthy((v) => !v);
     };
     const up = (e: KeyboardEvent) => {
       if (e.code === "ArrowUp" || e.code === "KeyW") keys.current.up = false;
@@ -69,15 +75,50 @@ export default function App() {
     const iv = setInterval(() => {
       const throttle = (keys.current.up ? 1 : 0) + (keys.current.down ? -0.7 : 0);
       const steer = (keys.current.left ? -1 : 0) + (keys.current.right ? 1 : 0);
-      wsRef.current?.readyState === 1 &&
-        wsRef.current.send(JSON.stringify({ type: "steer", kartId, throttle, steer }));
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== 1) return;
+      ws.send(JSON.stringify({ type: "steer", kartId, throttle, steer }));
+      const me = snap?.karts.find((k) => k.id === kartId);
+      const sample: DualPoseSample = {
+        kartId,
+        kartWorld: {
+          kartId,
+          frame: "track_local",
+          x: me?.x ?? 46.5,
+          y: 0,
+          z: me?.y ?? 0,
+          yawRad: me?.headingRad ?? Math.PI / 2,
+          pitchRad: 0,
+          rollRad: 0,
+          speedMps: me?.speedMps ?? 0,
+          provider: unhealthy ? "kart_vio" : "stub",
+          quality: unhealthy ? 0.12 : 1,
+          ts: Date.now(),
+        },
+        look: {
+          kartId,
+          frame: "kart_body",
+          x: 0,
+          y: 0,
+          z: 0,
+          yawRad: look.current.yaw,
+          pitchRad: look.current.pitch,
+          rollRad: 0,
+          speedMps: 0,
+          provider: lookSource,
+          quality: 1,
+          ts: Date.now(),
+        },
+        lookSource,
+      };
+      ws.send(JSON.stringify({ type: "dual_pose", sample }));
     }, 50);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       clearInterval(iv);
     };
-  }, [kartId]);
+  }, [kartId, unhealthy, lookSource, snap]);
 
   const me: KartPublic | undefined = snap?.karts.find((k) => k.id === kartId);
 
@@ -97,28 +138,34 @@ export default function App() {
       : snap.heatDurationMs
     : 0;
   const surging = Boolean(predict && Date.now() < predict.until) || Boolean(me && snap && me.surgeUntil > snap.serverNow);
+  const fxOn = Boolean(me?.worldFxAllowed) && !unhealthy;
 
   return (
-    <div className={`hud ${surging ? "surge" : ""} ${snap?.safeMode ? "safe" : ""}`}>
+    <div className={`visor ${surging ? "surge" : ""} ${snap?.safeMode ? "safe" : ""} ${fxOn ? "" : "nofx"}`}>
+      <PassthroughView snap={snap} selfId={kartId} lookYaw={lookYaw} lookPitch={lookPitch} surging={surging} forceHide={unhealthy} />
+
       <div className="chrome top">
         <div>
           <div className="brand">VOLTAGE LEAGUE</div>
-          <div className="meta">Track map / sim driver · visor is Quest passthrough at /quest</div>
+          <div className="meta">Quest OpenXR lab · registered world FX · not a face-lock HUD</div>
         </div>
         <div className="clock">{fmt(remaining)}</div>
         <div className="phase">
           PHASE {snap?.phase ?? 0} · VISUAL
-          <div className="meta">{snap?.localization.provider} loc · {snap?.status}</div>
+          <div className="meta">
+            {snap?.localization.provider} · {lookSource} · {snap?.status}
+          </div>
         </div>
       </div>
 
-      <TrackView snap={snap} selfId={kartId} surging={surging} />
+      {!fxOn && (
+        <div className="hide-banner">
+          WORLD FX HIDDEN
+          <span>{me?.hideReason ?? "kart world pose unhealthy"} · pads/gates require KartVio</span>
+        </div>
+      )}
 
       <div className="chrome bottom">
-        <div className="chip">
-          <span>POS</span>
-          <b>{rankOf(snap, kartId)}</b>
-        </div>
         <div className="chip">
           <span>SPD</span>
           <b>{me ? me.speedMps.toFixed(0) : "0"}</b>
@@ -126,6 +173,14 @@ export default function App() {
         <div className="chip">
           <span>LAPS</span>
           <b>{me?.laps ?? 0}</b>
+        </div>
+        <div className={`chip ${!unhealthy && me?.worldPoseHealthy ? "on" : ""}`}>
+          <span>KART VIO</span>
+          <b>{!unhealthy && me?.worldPoseHealthy ? "OK" : "BAD"}</b>
+        </div>
+        <div className={`chip ${fxOn ? "on" : ""}`}>
+          <span>WORLD FX</span>
+          <b>{fxOn ? "ON" : "OFF"}</b>
         </div>
         <div className={`chip ${me?.inventory.defensive ? "on mag" : ""}`}>
           <span>DEF Q</span>
@@ -137,116 +192,63 @@ export default function App() {
         </div>
         <div className={`tele ${predict?.source ?? ""}`}>
           {snap?.safeMode
-            ? "SAFE MODE — boosts cancelled"
+            ? "SAFE MODE — boosts cancelled · visual only"
             : surging
               ? `SURGE ${predict?.source === "predict" ? "PREDICT" : "AUTH"} · visual 1.5–2.5s`
-              : nextPadTelegraph(snap, me)}
+              : fxOn
+                ? "PADS/GATES WORLD-LOCKED · drag to look"
+                : "FAIL-SAFE: hide registered FX"}
         </div>
       </div>
 
       {assist && assist.telegraph && <div className="toast">{assist.telegraph}</div>}
-      <Pad
-        hold={(k, v) => {
-          keys.current[k] = v;
-          const throttle = (keys.current.up ? 1 : 0) + (keys.current.down ? -0.7 : 0);
-          const steer = (keys.current.left ? -1 : 0) + (keys.current.right ? 1 : 0);
-          if (wsRef.current?.readyState === 1) {
-            wsRef.current.send(JSON.stringify({ type: "steer", kartId, throttle, steer }));
-          }
+
+      <div
+        className="look-hit"
+        onPointerDown={(e) => {
+          dragging.current = true;
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         }}
-        use={(slot) => wsRef.current?.send(JSON.stringify({ type: "use_pickup", kartId, slot }))}
+        onPointerUp={() => {
+          dragging.current = false;
+        }}
+        onPointerMove={(e) => {
+          if (!dragging.current) return;
+          look.current.yaw -= e.movementX * 0.005;
+          look.current.pitch = clamp(look.current.pitch - e.movementY * 0.004, -0.9, 0.6);
+          setLookYaw(look.current.yaw);
+          setLookPitch(look.current.pitch);
+        }}
       />
-      <div className="help">Hold THR / steer on visor, or WASD · Q defensive · E pace · local VFX predict</div>
-    </div>
-  );
-}
 
-function Pad({
-  hold,
-  use,
-}: {
-  hold: (k: "up" | "down" | "left" | "right", v: boolean) => void;
-  use: (slot: "defensive" | "pace") => void;
-}) {
-  const [down, setDown] = useState<Record<string, boolean>>({});
-  const bind = (k: "up" | "down" | "left" | "right") => {
-    const start = (e: PointerEvent | ReactMouse) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setDown((d) => ({ ...d, [k]: true }));
-      hold(k, true);
-      const el = e.currentTarget as HTMLElement;
-      if ("pointerId" in e) {
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          /* automated browsers may not expose capture */
-        }
-      }
-    };
-    const stop = (e?: PointerEvent | ReactMouse) => {
-      e?.preventDefault();
-      setDown((d) => ({ ...d, [k]: false }));
-      hold(k, false);
-    };
-    return {
-      onPointerDown: start,
-      onPointerUp: stop,
-      onPointerCancel: stop,
-      onLostPointerCapture: () => stop(),
-      onContextMenu: (e: ReactMouse) => e.preventDefault(),
-    };
-  };
-  return (
-    <div className="pad">
-      <div className="stick">
-        <button type="button" className={`pad-btn ${down.left ? "hot" : ""}`} {...bind("left")}>
-          ◀
+      <div className="lab-controls">
+        <button type="button" className={unhealthy ? "hot" : ""} onClick={() => setUnhealthy((v) => !v)}>
+          {unhealthy ? "Kart pose UNHEALTHY" : "Kart pose healthy (sim)"}
         </button>
-        <div className="stick-mid">
-          <button type="button" className={`pad-btn thr ${down.up ? "hot" : ""}`} {...bind("up")}>
-            THR
-          </button>
-          <button type="button" className={`pad-btn brk ${down.down ? "hot" : ""}`} {...bind("down")}>
-            BRK
-          </button>
-        </div>
-        <button type="button" className={`pad-btn ${down.right ? "hot" : ""}`} {...bind("right")}>
-          ▶
+        <button type="button" onClick={() => setLookSource((s) => (s === "hmd_slam" ? "helmet_vio" : "hmd_slam"))}>
+          Look: {lookSource}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            look.current = { yaw: 0, pitch: -0.08 };
+            setLookYaw(0);
+            setLookPitch(-0.08);
+          }}
+        >
+          Recenter look
         </button>
       </div>
-      <div className="use-row">
-        <button type="button" className="pad-btn mag" onClick={() => use("defensive")}>
-          DEF
-        </button>
-        <button type="button" className="pad-btn gold" onClick={() => use("pace")}>
-          PACE
-        </button>
+      <div className="help">
+        Drag to look (HMD SLAM sim) · WASD drive · Q/E pickups · H unhealthy KartVio · Phase 0 visual only · no motor
+        assist
       </div>
     </div>
   );
 }
 
-function rankOf(snap: SessionSnapshot | null, id: string): string {
-  if (!snap) return "—";
-  const row = (snap.results ?? []).find((r) => r.kartId === id);
-  return row ? String(row.rank) : "—";
-}
-
-function nextPadTelegraph(snap: SessionSnapshot | null, me?: KartPublic): string {
-  if (!snap || !me) return "WAITING FOR SESSION";
-  if (snap.status === "lobby") return "LOBBY — wait for ops START";
-  if (snap.status === "results") return "HEAT COMPLETE";
-  let best = Infinity;
-  let name = "PAD";
-  for (const p of snap.track.pads) {
-    const d = Math.hypot(p.x - me.x, p.y - me.y);
-    if (d < best) {
-      best = d;
-      name = p.id;
-    }
-  }
-  return `NEXT ${name.toUpperCase()}  ${best.toFixed(0)}m · pad CD 8–12s`;
+function clamp(n: number, a: number, b: number) {
+  return Math.max(a, Math.min(b, n));
 }
 
 function fmt(ms: number): string {

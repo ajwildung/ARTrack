@@ -7,7 +7,7 @@ import type { AssistRecord } from "./assist.ts";
 interface Client {
   id: string;
   ws: WebSocket;
-  role: "ops" | "hud" | "kart" | "unknown";
+  role: "ops" | "hud" | "kart" | "headset" | "kart_cam" | "unknown";
   kartId?: string;
 }
 
@@ -53,9 +53,10 @@ export class Hub {
   private onMessage(client: Client, msg: ClientMessage): void {
     if (msg.type === "hello") {
       client.role = msg.role;
-      if (msg.role === "hud" || msg.role === "kart") {
+      if (msg.role === "hud" || msg.role === "kart" || msg.role === "headset" || msg.role === "kart_cam") {
         const id = msg.kartId || `KART-${client.id}`;
-        const kart = this.session.upsertKart(id, msg.name || id, false);
+        const kind = msg.role === "headset" || msg.role === "kart_cam" ? msg.role : undefined;
+        const kart = this.session.upsertKart(id, msg.name || id, false, kind);
         client.kartId = kart.id;
       }
       this.send(client, { type: "hello_ok", clientId: client.id, snapshot: this.session.snapshot() });
@@ -99,6 +100,17 @@ export class Hub {
 
     if (msg.type === "pose") {
       this.session.applyPose(msg.pose);
+      return;
+    }
+
+    if (msg.type === "dual_pose") {
+      this.session.applyDualPose(msg.sample);
+      return;
+    }
+
+    if (msg.type === "hmd_pose") {
+      const id = msg.kartId || client.kartId;
+      if (id) this.session.applyHmdPose(id, msg.pose);
       return;
     }
 
