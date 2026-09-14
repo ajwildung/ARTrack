@@ -264,16 +264,14 @@ function fillProjected(
   fill: string,
 ) {
   const screen = [];
-  let visible = 0;
   const intr = { ...DEFAULT_INTRINSICS, aspect: w / h };
   for (const p of pts) {
     const pr = projectWorldPoint(p, cam, intr);
-    if (!pr.inFront) continue;
-    visible += 1;
-    const s = ndcToScreen(pr.nx, pr.ny, w, h);
-    screen.push(s);
+    // Partial clips turn ground discs into huge screen triangles — skip the fill.
+    if (!pr.inFront || Math.abs(pr.nx) > 4 || Math.abs(pr.ny) > 4) return;
+    screen.push(ndcToScreen(pr.nx, pr.ny, w, h));
   }
-  if (visible < 3) return;
+  if (screen.length < 3) return;
   ctx.beginPath();
   ctx.moveTo(screen[0].x, screen[0].y);
   for (let i = 1; i < screen.length; i++) ctx.lineTo(screen[i].x, screen[i].y);

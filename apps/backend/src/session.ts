@@ -101,7 +101,9 @@ export class SessionOrchestrator {
       return existing;
     }
     const i = this.karts.length;
-    const pose = racingPose(this.economy.track, (-i / 6) * 0.35);
+    // Sit just ahead of the start/finish pad so the visor looks at registered FX, not from inside a disc.
+    const theta = (-i / 6) * 0.35 + 0.28;
+    const pose = racingPose(this.economy.track, theta);
     const kart = createKart(
       {
         id,
@@ -110,7 +112,7 @@ export class SessionOrchestrator {
         x: pose.x,
         y: pose.y,
         headingRad: pose.heading,
-        theta: (-i / 6) * 0.35,
+        theta,
       },
       i,
     );

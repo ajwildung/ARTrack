@@ -174,9 +174,9 @@ export default function App() {
           <span>LAPS</span>
           <b>{me?.laps ?? 0}</b>
         </div>
-        <div className={`chip ${me?.worldPoseHealthy ? "on" : ""}`}>
+        <div className={`chip ${!unhealthy && me?.worldPoseHealthy ? "on" : ""}`}>
           <span>KART VIO</span>
-          <b>{me?.worldPoseHealthy ? "OK" : "BAD"}</b>
+          <b>{!unhealthy && me?.worldPoseHealthy ? "OK" : "BAD"}</b>
         </div>
         <div className={`chip ${fxOn ? "on" : ""}`}>
           <span>WORLD FX</span>
