@@ -1,0 +1,116 @@
+/**
+ * M1 smoke: Lobby → Live pad surge → physical probe rejected → Safe Mode → audit PASS.
+ * Run: npm run smoke
+ */
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { startVoltageServer } from "./server.ts";
+
+async function main() {
+  const dir = mkdtempSync(join(tmpdir(), "vl-smoke-"));
+  const server = await startVoltageServer({
+    port: 0,
+    host: "127.0.0.1",
+    heatMs: 8000,
+    dbPath: join(dir, "smoke.sqlite"),
+    allowGateProbe: true,
+  });
+  const base = server.url;
+  const fail: string[] = [];
+  const pass: string[] = [];
+
+  const check = (name: string, cond: boolean, extra?: unknown) => {
+    if (cond) pass.push(name);
+    else {
+      fail.push(name);
+      console.error("FAIL", name, extra ?? "");
+    }
+  };
+
+  try {
+    const health = await (await fetch(`${base}/api/health`)).json();
+    check("health phase=0", health.phase === 0);
+    check("health physicalAssistEnabled=false", health.physicalAssistEnabled === false);
+    check("health brand", health.brand === "Voltage League");
+    check("health localization stub", health.localization?.provider === "stub");
+
+    await fetch(`${base}/api/ops/seed_sims`, { method: "POST" });
+    const started = await (await fetch(`${base}/api/ops/start`, { method: "POST" })).json();
+    check("start live", started.ok === true && started.snapshot.status === "live");
+    check("heat 8:00 default overridden for smoke", started.snapshot.heatDurationMs === 8000);
+    check("pads 2-4", started.snapshot.pads.length >= 2 && started.snapshot.pads.length <= 4);
+
+    const kart = server.session.karts[0];
+    const pad = server.session.economy.pads[0];
+    kart.x = pad.x;
+    kart.y = pad.y;
+    const surge = server.session.economy.tryPad(kart, pad, Date.now());
+    check("pad surge visual", surge?.channel === "visual" && surge.vfx.type === "surge");
+    check("surge has null physicalOffset", surge?.physicalOffset === null);
+    check("surge actuators absent", surge?.actuatorPresent === false);
+
+    const probe = await (
+      await fetch(`${base}/api/debug/try-physical`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kartId: kart.id,
+          canTorqueNm: 80,
+          motorOverlay: { enable: true },
+          physicalOffset: { torqueNm: 12 },
+        }),
+      })
+    ).json();
+    check("physical probe rejected", probe.rejected === true);
+    check("probe did not persist torque", probe.record?.canTorqueNm === null);
+
+    const safe = await (await fetch(`${base}/api/ops/safe_mode`, { method: "POST" })).json();
+    check("safe mode latched", safe.snapshot.safeMode === true);
+    check(
+      "failsafe ≤500ms",
+      (safe.snapshot.failsafe.lastLatencyMs ?? 999) <= 500 && safe.snapshot.failsafe.lastWithinBudget === true,
+    );
+
+    const report = await (await fetch(`${base}/api/audit/phase0`)).json();
+    check("phase0 gate PASS", report.gate === "PASS");
+    check("zero emitted physical offsets", report.emittedPhysicalOffsets === 0);
+    check("accepted visual intents ≥1", report.acceptedIntents >= 1);
+    check("rejected physical ≥1", report.rejectedPhysicalAttempts >= 1);
+
+    const assist = await (await fetch(`${base}/api/audit/assist`)).json();
+    const accepted = assist.intents.filter((i: { rejected: boolean }) => !i.rejected);
+    check(
+      "every accepted intent is visual-only",
+      accepted.every(
+        (i: { channel: string; physicalOffset: unknown; canTorqueNm: unknown; motorOverlay: unknown; actuatorPresent: boolean }) =>
+          i.channel === "visual" &&
+          i.physicalOffset === null &&
+          i.canTorqueNm === null &&
+          i.motorOverlay === null &&
+          i.actuatorPresent === false,
+      ),
+    );
+
+    await fetch(`${base}/api/ops/abort`, { method: "POST" });
+    const results = await (await fetch(`${base}/api/session`)).json();
+    check("results screen", results.status === "results");
+
+    console.log("\nVoltage League M1 smoke");
+    console.log(`  PASS ${pass.length}  FAIL ${fail.length}`);
+    for (const n of pass) console.log("  ✓", n);
+    if (fail.length) {
+      for (const n of fail) console.log("  ✗", n);
+      process.exitCode = 1;
+    } else {
+      console.log("  Phase 0 gate: PASS (no physical offsets)");
+    }
+  } finally {
+    await server.close();
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

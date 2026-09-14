@@ -1,0 +1,131 @@
+:root {
+  --bg: #07080c;
+  --panel: #10141c;
+  --ink: #e7f3ff;
+  --muted: #7d8ea3;
+  --cyan: #2ee6ff;
+  --amber: #ffb020;
+  --red: #ff4d4d;
+  --green: #5dff9a;
+  --magenta: #ff3d8a;
+  --line: #1c2533;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: "Segoe UI", "Helvetica Neue", system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #123044 0%, transparent 50%),
+    radial-gradient(900px 400px at 100% 0%, #2a1a10 0%, transparent 45%),
+    var(--bg);
+  color: var(--ink);
+}
+
+.boot, .shell { min-height: 100%; padding: 18px 22px 110px; }
+.wordmark, .title {
+  letter-spacing: 0.22em;
+  font-weight: 800;
+  font-size: 22px;
+}
+.muted { color: var(--muted); }
+.tiny { font-size: 12px; margin-top: 6px; }
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+.brand { display: flex; gap: 12px; align-items: center; }
+.bolt { font-size: 28px; filter: drop-shadow(0 0 8px var(--cyan)); }
+.sub { color: var(--muted); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill {
+  border: 1px solid var(--line);
+  padding: 4px 8px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.pill.phase { color: var(--cyan); border-color: #164a55; }
+.pill.vis { color: var(--green); border-color: #1b4a32; }
+.pill.gate.ok { color: var(--green); }
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 18px;
+  margin: 18px 0;
+}
+.clock {
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(48px, 9vw, 96px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 0.95;
+  text-shadow: 0 0 24px rgba(46, 230, 255, 0.25);
+}
+.clock-label, .state-label {
+  color: var(--muted);
+  letter-spacing: 0.18em;
+  font-size: 11px;
+}
+.state { font-size: 32px; font-weight: 800; letter-spacing: 0.16em; }
+.status-live .state { color: var(--cyan); }
+.status-results .state { color: var(--amber); }
+.safe .state { color: var(--amber); }
+
+.panel {
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border: 1px solid var(--line);
+  padding: 16px 18px;
+}
+.panel h2 { margin: 0 0 10px; letter-spacing: 0.14em; font-size: 14px; text-transform: uppercase; }
+.live-grid { display: grid; grid-template-columns: 1.4fr 0.8fr; gap: 18px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11px; letter-spacing: 0.1em; padding: 6px 4px; }
+td { padding: 8px 4px; border-top: 1px solid var(--line); }
+.swatch { display: inline-block; width: 10px; height: 10px; }
+.empty { padding: 24px 0; color: var(--muted); }
+.econ { list-style: none; padding: 0; margin: 0; }
+.econ li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.tag { display: inline-block; font-size: 10px; letter-spacing: 0.12em; margin-right: 8px; padding: 2px 6px; }
+.tag.pad { color: var(--cyan); border: 1px solid #164a55; }
+.tag.defensive { color: var(--magenta); border: 1px solid #4a1833; }
+.tag.pace { color: var(--amber); border: 1px solid #4a3a12; }
+.safe-note { margin-top: 12px; color: var(--amber); }
+.banner { background: #3a1515; color: #ffc9c9; padding: 8px 12px; margin-bottom: 12px; }
+
+.actions {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  gap: 10px;
+  padding: 12px 22px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, #07080c 30%);
+}
+.btn {
+  flex: 1;
+  min-height: 56px;
+  border: 1px solid var(--line);
+  background: #0c1118;
+  color: var(--ink);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn.start { background: #062a32; border-color: #1a6c7a; color: var(--cyan); }
+.btn.abort { background: #2a0d0d; border-color: #7a1a1a; color: var(--red); }
+.btn.safe { background: #2a1c06; border-color: #7a5a1a; color: var(--amber); }
+.btn.seed, .btn.reset { font-size: 12px; }
+
+@media (max-width: 800px) {
+  .hero, .live-grid, .top { display: block; }
+  .actions { flex-wrap: wrap; }
+  .btn { min-width: 30%; }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "Voltage League Ops",
+  "short_name": "VL Ops",
+  "start_url": "/ops/",
+  "display": "standalone",
+  "background_color": "#07080c",
+  "theme_color": "#07080c",
+  "orientation": "landscape",
+  "description": "Track LAN race control — Lobby / Live / Results"
+}
