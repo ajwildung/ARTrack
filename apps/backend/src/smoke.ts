@@ -36,12 +36,22 @@ async function main() {
     check("health brand", health.brand === "Voltage League");
     check("health platform pro2 visual-only", health.platform === "ninebot_gokart_pro2" && health.actuatorsPresent === false);
     check("health localization stub", health.localization?.provider === "stub");
+    check("health compositor quest lab", health.compositor?.labDisplay === "quest_openxr_passthrough");
+    check("health no eyeride path", health.display?.eyeride === false && health.compositor?.eyeridePath === false);
+    check("health world FX policy", health.compositor?.worldFxPolicy === "hide_if_kart_world_unhealthy");
+    check("health fusion note", typeof health.localization?.note === "string");
 
     await fetch(`${base}/api/ops/seed_sims`, { method: "POST" });
     const started = await (await fetch(`${base}/api/ops/start`, { method: "POST" })).json();
     check("start live", started.ok === true && started.snapshot.status === "live");
     check("heat 8:00 default overridden for smoke", started.snapshot.heatDurationMs === 8000);
     check("pads 2-4", started.snapshot.pads.length >= 2 && started.snapshot.pads.length <= 4);
+    check("gates present", Array.isArray(started.snapshot.track?.gates) && started.snapshot.track.gates.length >= 1);
+
+    const headset = await headsetDualPose(base.replace("http", "ws") + "/ws", "SMOKE-QUEST");
+    check("headset hello joins session", headset.joined);
+    check("unhealthy KartVio hides world FX", headset.hidden === true && headset.hideReason === "low_quality");
+    check("healthy dual pose allows world FX", headset.shown === true);
 
     const driven = await driveKart(base.replace("http", "ws") + "/ws", "SMOKE-HUD");
     check("hud steer produces motion (no physical assist)", driven.speedMps > 2 && driven.moved);
@@ -103,7 +113,7 @@ async function main() {
     const results = await (await fetch(`${base}/api/session`)).json();
     check("results screen", results.status === "results");
 
-    console.log("\nVoltage League M1 smoke");
+    console.log("\nVoltage League M2 smoke");
     console.log(`  PASS ${pass.length}  FAIL ${fail.length}`);
     for (const n of pass) console.log("  ✓", n);
     if (fail.length) {
@@ -121,6 +131,88 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+});
+
+async function headsetDualPose(
+  wsUrl: string,
+  kartId: string,
+): Promise<{ joined: boolean; hidden: boolean; hideReason: string | null; shown: boolean }> {
+  const ws = new WebSocket(wsUrl);
+  await new Promise<void>((resolve, reject) => {
+    ws.on("open", () => resolve());
+    ws.on("error", reject);
+  });
+  ws.send(JSON.stringify({ type: "hello", role: "headset", kartId, name: "Smoke Quest" }));
+  await new Promise((r) => setTimeout(r, 150));
+  const http = wsUrl.replace("ws", "http").replace(/\/ws$/, "");
+  const joinedSnap = await (await fetch(`${http}/api/session`)).json();
+  const joined = Boolean(joinedSnap.karts.find((k: { id: string }) => k.id === kartId)?.headsetConnected);
+
+  const now = Date.now();
+  const me = joinedSnap.karts.find((k: { id: string; x: number; y: number; headingRad: number }) => k.id === kartId);
+  const baseWorld = {
+    kartId,
+    frame: "track_local",
+    x: me?.x ?? 46.5,
+    y: 0,
+    z: me?.y ?? 0,
+    yawRad: me?.headingRad ?? 1.57,
+    pitchRad: 0,
+    rollRad: 0,
+    speedMps: 0,
+    ts: now,
+  };
+  const look = {
+    kartId,
+    frame: "kart_body",
+    x: 0,
+    y: 0,
+    z: 0,
+    yawRad: 0,
+    pitchRad: 0,
+    rollRad: 0,
+    speedMps: 0,
+    provider: "hmd_slam",
+    quality: 1,
+    ts: now,
+  };
+  ws.send(
+    JSON.stringify({
+      type: "dual_pose",
+      sample: {
+        kartId,
+        kartWorld: { ...baseWorld, provider: "kart_vio", quality: 0.12 },
+        look,
+        lookSource: "hmd_slam",
+      },
+    }),
+  );
+  await new Promise((r) => setTimeout(r, 120));
+  const hiddenSnap = await (await fetch(`${http}/api/session`)).json();
+  const hiddenKart = hiddenSnap.karts.find((k: { id: string }) => k.id === kartId);
+  ws.send(
+    JSON.stringify({
+      type: "dual_pose",
+      sample: {
+        kartId,
+        kartWorld: { ...baseWorld, provider: "stub", quality: 1, ts: Date.now() },
+        look: { ...look, ts: Date.now() },
+        lookSource: "hmd_slam",
+      },
+    }),
+  );
+  await new Promise((r) => setTimeout(r, 120));
+  const shownSnap = await (await fetch(`${http}/api/session`)).json();
+  const shownKart = shownSnap.karts.find((k: { id: string }) => k.id === kartId);
+  ws.close();
+  return {
+    joined,
+    hidden: hiddenKart?.worldFxAllowed === false,
+    hideReason: hiddenKart?.hideReason ?? null,
+    shown: shownKart?.worldFxAllowed === true,
+  };
+}
 
 async function driveKart(wsUrl: string, kartId: string): Promise<{ speedMps: number; moved: boolean }> {
   const ws = new WebSocket(wsUrl);

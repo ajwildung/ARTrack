@@ -52,6 +52,16 @@ export function TrackView({
       ctx.font = "11px ui-monospace, monospace";
       ctx.fillText(pad.id, tx(pad.x) - 14, ty(pad.y) - pad.radiusM * scale - 6);
     }
+    for (const g of track.gates ?? []) {
+      const hx = Math.sin(g.headingRad) * g.widthM * 0.5 * scale;
+      const hy = Math.cos(g.headingRad) * g.widthM * 0.5 * scale;
+      ctx.beginPath();
+      ctx.moveTo(tx(g.x) - hx, ty(g.y) - hy);
+      ctx.lineTo(tx(g.x) + hx, ty(g.y) + hy);
+      ctx.strokeStyle = g.kind === "start_finish" ? "#e7f3ff" : "rgba(46,230,255,0.7)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
     for (const p of snap.pickups) {
       ctx.beginPath();
       ctx.arc(tx(p.x), ty(p.y), p.radiusM * scale, 0, Math.PI * 2);

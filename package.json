@@ -2,14 +2,14 @@
   "name": "voltage-league",
   "private": true,
   "version": "0.1.0",
-  "description": "Voltage League / AR go-kart — M1 Sprint Heat soft-visual loop (Phase 0)",
+  "description": "Voltage League / AR go-kart — M2 Quest OpenXR lab compositor (Phase 0 visual-only)",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
-    "dev": "concurrently -n api,ops,hud -c cyan,magenta,green \"npm run dev -w @voltage/backend\" \"npm run dev -w @voltage/ops\" \"npm run dev -w @voltage/hud\"",
-    "build": "npm run build -w @voltage/ops && npm run build -w @voltage/hud",
+    "dev": "concurrently -n api,ops,hud,quest -c cyan,magenta,green,yellow \"npm run dev -w @voltage/backend\" \"npm run dev -w @voltage/ops\" \"npm run dev -w @voltage/hud\" \"npm run dev -w @voltage/quest\"",
+    "build": "npm run build -w @voltage/ops && npm run build -w @voltage/hud && npm run build -w @voltage/quest",
     "start": "npm run start -w @voltage/backend",
     "test": "npm run test -w @voltage/backend",
     "smoke": "npm run smoke -w @voltage/backend",

@@ -1,4 +1,4 @@
-/** Track-local frame. M1 localization is STUB — not outdoor-only. */
+/** Track-local frame. M1 stub still valid; M2 dual-pose fusion maps the same meters. */
 
 export interface Vec2 {
   x: number;
@@ -15,6 +15,18 @@ export interface TrackLayout {
   racing: { rx: number; ry: number };
   pads: PadDef[];
   pickupNodes: PickupNodeDef[];
+  /** World-locked start/finish (and pad) arches drawn by the Quest compositor. */
+  gates: GateDef[];
+}
+
+export interface GateDef {
+  id: string;
+  kind: "start_finish" | "pad";
+  x: number;
+  y: number;
+  headingRad: number;
+  widthM: number;
+  heightM: number;
 }
 
 export interface PadDef {
@@ -56,6 +68,31 @@ export function defaultTrack(padCount = 3, pickupNodes = 3): TrackLayout {
     pickup.push({ id: `node-${i + 1}`, index: i, x: p.x, y: p.y, radiusM: 2.8 });
   }
 
+  const gates: GateDef[] = [];
+  const sf = racingPose({ racing } as TrackLayout, 0);
+  gates.push({
+    id: "gate-sf",
+    kind: "start_finish",
+    x: sf.x,
+    y: sf.y,
+    headingRad: sf.heading,
+    widthM: 5.2,
+    heightM: 3.2,
+  });
+  for (const pad of pads) {
+    const theta = Math.atan2(pad.y / racing.ry, pad.x / racing.rx);
+    const pose = racingPose({ racing } as TrackLayout, theta);
+    gates.push({
+      id: `gate-${pad.id}`,
+      kind: "pad",
+      x: pad.x,
+      y: pad.y,
+      headingRad: pose.heading,
+      widthM: 4.4,
+      heightM: 2.6,
+    });
+  }
+
   return {
     id: "vl-stub-oval-01",
     name: "Stub Oval (track-local)",
@@ -65,6 +102,7 @@ export function defaultTrack(padCount = 3, pickupNodes = 3): TrackLayout {
     racing,
     pads,
     pickupNodes: pickup,
+    gates,
   };
 }
 

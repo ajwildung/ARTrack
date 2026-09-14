@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   BRAND,
+  COMPOSITOR_PUBLIC,
   DISABLED_M1,
   PHASE,
   PLATFORM,
@@ -8,8 +9,10 @@ import {
   approxLapLengthM,
   clampToAsphalt,
   racingPose,
+  type DualPoseSample,
   type KartPublic,
   type Pose,
+  type Pose3,
   type ResultRow,
   type SessionSnapshot,
   type SessionStatus,
@@ -34,7 +37,7 @@ export class SessionOrchestrator {
   results: ResultRow[] | null = null;
 
   readonly scoring = new Scoring();
-  readonly loc: LocalizationEngine = createLocalization("stub");
+  readonly loc: LocalizationEngine = createLocalization();
   readonly assist: AssistGateway;
   readonly economy: EconomyScheduler;
   readonly failsafe: FailSafe;
@@ -51,6 +54,7 @@ export class SessionOrchestrator {
   }
 
   snapshot(now = Date.now()): SessionSnapshot {
+    this.refreshFusion(now);
     return {
       phase: PHASE,
       brand: BRAND,
@@ -66,11 +70,11 @@ export class SessionOrchestrator {
       startedAt: this.startedAt,
       endsAt: this.endsAt,
       serverNow: now,
-      localization: {
-        provider: "stub",
-        frame: "track_local",
-        note: this.loc.note,
-      },
+      localization: this.loc.describe(),
+      compositor: COMPOSITOR_PUBLIC,
+      headsets: this.karts
+        .filter((k) => k.headsetConnected)
+        .map((k) => ({ kartId: k.id, lookSource: k.lookSource, worldFxAllowed: k.worldFxAllowed })),
       disabled: DISABLED_M1,
       track: this.economy.track,
       karts: this.karts.map(publicKart),
@@ -86,12 +90,14 @@ export class SessionOrchestrator {
     };
   }
 
-  upsertKart(id: string, name: string, sim = false): KartState {
+  upsertKart(id: string, name: string, sim = false, kind?: "headset" | "kart_cam"): KartState {
     const existing = this.karts.find((k) => k.id === id);
     if (existing) {
       existing.connected = true;
       existing.name = name || existing.name;
       existing.sim = sim || existing.sim;
+      if (kind === "headset") existing.headsetConnected = true;
+      if (kind === "kart_cam") existing.kartCamConnected = true;
       return existing;
     }
     const i = this.karts.length;
@@ -109,13 +115,18 @@ export class SessionOrchestrator {
       i,
     );
     this.karts.push(kart);
-    this.db.insertEvent(this.sessionId, "kart_join", id, { name: kart.name, sim });
+    if (kind === "headset") kart.headsetConnected = true;
+    if (kind === "kart_cam") kart.kartCamConnected = true;
+    this.db.insertEvent(this.sessionId, "kart_join", id, { name: kart.name, sim, kind: kind ?? "kart" });
     return kart;
   }
 
   markDisconnected(kartId: string): void {
     const k = this.karts.find((x) => x.id === kartId);
-    if (k) k.connected = false;
+    if (k) {
+      k.connected = false;
+      k.headsetConnected = false;
+    }
   }
 
   seedSims(count = 3): KartState[] {
@@ -222,10 +233,49 @@ export class SessionOrchestrator {
     k.headingRad = ingested.headingRad;
     k.speedMps = ingested.speedMps;
     k.locProvider = ingested.provider;
+    k.locQuality = ingested.quality ?? 1;
     k.lastPoseAt = ingested.ts;
     k.connected = true;
     k.sim = false;
+    k.externalWorld = ingested.provider !== "stub";
+    if (ingested.provider !== "stub") k.kartCamConnected = true;
     this.accumulateDistance(k);
+  }
+
+  applyDualPose(sample: DualPoseSample): void {
+    const k = this.karts.find((x) => x.id === sample.kartId);
+    if (!k) return;
+    const fused = this.loc.ingestDual(sample);
+    const liveVio = sample.kartWorld.provider !== "stub" && sample.kartWorld.quality >= 0.45;
+    if (liveVio) {
+      k.x = sample.kartWorld.x;
+      k.y = sample.kartWorld.z;
+      k.headingRad = sample.kartWorld.yawRad;
+      k.speedMps = sample.kartWorld.speedMps;
+      this.accumulateDistance(k);
+    }
+    k.locProvider = fused.provider;
+    k.locQuality = fused.quality;
+    k.worldPoseHealthy = fused.kartWorldHealthy;
+    k.worldFxAllowed = fused.worldFxAllowed;
+    k.lookSource = fused.lookSource;
+    k.hideReason = fused.hideReason;
+    k.lastPoseAt = sample.kartWorld.ts;
+    k.connected = true;
+    k.sim = false;
+    k.externalWorld = sample.kartWorld.provider !== "stub" || sample.kartWorld.quality < 0.45;
+    k.kartCamConnected = sample.kartWorld.provider !== "stub";
+    if (sample.lookSource === "hmd_slam" || sample.lookSource === "helmet_vio") k.headsetConnected = true;
+  }
+
+  applyHmdPose(kartId: string, pose: Pose3): void {
+    const k = this.karts.find((x) => x.id === kartId);
+    if (!k) return;
+    const source = pose.provider === "helmet_vio" ? "helmet_vio" : "hmd_slam";
+    this.loc.ingestLook(pose, source);
+    k.headsetConnected = true;
+    k.lookSource = source;
+    k.connected = true;
   }
 
   usePickup(kartId: string, slot: "defensive" | "pace"): AssistRecord | null {
@@ -255,6 +305,8 @@ export class SessionOrchestrator {
         k.x = pose.x;
         k.y = pose.y;
         k.headingRad = pose.heading;
+      } else if (k.externalWorld && k.locQuality >= 0.45 && now - k.lastPoseAt < 250) {
+        /* KartVio owns the pose — do not dead-reckon over a healthy world sample. */
       } else if (k.lastPoseAt && (now - k.lastPoseAt < 800 || Math.abs(k.speedMps) > 0.05)) {
         const stale = now - k.lastPoseAt >= 400;
         const throttle = stale ? 0 : k.throttle;
@@ -272,6 +324,31 @@ export class SessionOrchestrator {
       if (this.status === "live" && (k.sim || k.throttle !== 0 || k.speedMps > 0.4)) {
         this.accumulateDistance(k);
       }
+    }
+  }
+
+  private refreshFusion(now: number): void {
+    for (const k of this.karts) {
+      if (!k.externalWorld) {
+        this.loc.ingest({
+          kartId: k.id,
+          frame: "track_local",
+          x: k.x,
+          y: k.y,
+          headingRad: k.headingRad,
+          speedMps: k.speedMps,
+          provider: "stub",
+          quality: 1,
+          ts: now,
+        });
+      }
+      const fused = this.loc.fused(k.id, now);
+      k.worldPoseHealthy = fused.kartWorldHealthy;
+      k.worldFxAllowed = fused.worldFxAllowed;
+      k.lookSource = k.headsetConnected ? fused.lookSource : k.lookSource;
+      k.hideReason = fused.hideReason;
+      k.locQuality = fused.quality;
+      if (fused.provider === "dual_fusion") k.locProvider = "dual_fusion";
     }
   }
 
@@ -300,6 +377,13 @@ function publicKart(k: KartState): KartPublic {
     padCooldownUntil: k.padCooldownUntil,
     inventory: { ...k.inventory },
     locProvider: k.locProvider,
+    locQuality: k.locQuality,
+    worldPoseHealthy: k.worldPoseHealthy,
+    worldFxAllowed: k.worldFxAllowed,
+    lookSource: k.lookSource,
+    headsetConnected: k.headsetConnected,
+    kartCamConnected: k.kartCamConnected,
+    hideReason: k.hideReason,
   };
 }
 

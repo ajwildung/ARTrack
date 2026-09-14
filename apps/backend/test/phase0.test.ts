@@ -138,10 +138,12 @@ describe("Session + failsafe", () => {
 });
 
 describe("Localization plug-in", () => {
-  it("M1 factory returns stub; ingest stays track_local (ARKit later)", async () => {
-    const { createLocalization } = await import("../src/localization.ts");
-    const loc = createLocalization("arkit");
-    assert.equal(loc.provider, "stub");
+  it("stub factory stays stub; dual-fusion is the KartVio + HmdSlam plug-in", async () => {
+    const { createLocalization, DualPoseFusionEngine } = await import("../src/localization.ts");
+    const stub = createLocalization("stub");
+    assert.equal(stub.provider, "stub");
+    const loc = createLocalization("kart_vio");
+    assert.ok(loc instanceof DualPoseFusionEngine);
     const pose = loc.ingest({
       kartId: "K1",
       frame: "track_local",
@@ -149,12 +151,12 @@ describe("Localization plug-in", () => {
       y: 2,
       headingRad: 0,
       speedMps: 0,
-      provider: "arkit",
+      provider: "stub",
       quality: 1,
       ts: Date.now(),
     });
     assert.equal(pose.frame, "track_local");
-    assert.ok(loc.note.includes("AprilTags"));
-    assert.ok(loc.note.includes("display-only"));
+    assert.ok(loc.note.includes("KartVio"));
+    assert.ok(loc.note.includes("World FX hide"));
   });
 });

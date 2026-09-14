@@ -1,4 +1,4 @@
-/** Voltage League M1 — Sprint Heat rules and Phase 0 hard gate. */
+/** Voltage League M2 — Sprint Heat rules and Phase 0 hard gate. */
 
 export const BRAND = "Voltage League" as const;
 export const PHASE = 0 as const;
@@ -42,8 +42,41 @@ export const FORBIDDEN_ASSIST_FIELDS = [
 
 export type ForbiddenAssistField = (typeof FORBIDDEN_ASSIST_FIELDS)[number];
 
-export const LOCALIZATION_PROVIDERS = ["stub", "arkit", "vio", "apriltag", "hybrid", "rtk", "uwb"] as const;
+/** Plug-in ids. M1 shipped stub; M2 adds dual-pose fusion (KartVio + HelmetVio/HmdSlam). RTK/UWB stay demoted. */
+export const LOCALIZATION_PROVIDERS = [
+  "stub",
+  "kart_vio",
+  "helmet_vio",
+  "hmd_slam",
+  "apriltag",
+  "dual_fusion",
+  "arkit",
+  "vio",
+  "hybrid",
+  "rtk",
+  "uwb",
+] as const;
 export type LocalizationProvider = (typeof LOCALIZATION_PROVIDERS)[number];
+
+export const LOOK_SOURCES = ["none", "sim", "helmet_vio", "hmd_slam"] as const;
+export type LookSource = (typeof LOOK_SOURCES)[number];
 
 /** M1 chassis lock — visual overlay only. No OEM CAN/SDK assist on Pro 2. */
 export const PLATFORM = "ninebot_gokart_pro2" as const;
+
+/**
+ * Dual display track.
+ * Lab (this PR): Meta Quest OpenXR passthrough.
+ * Product (out of scope): partnered waveguide optics.
+ * EyeRide / CarPlay / Android Auto AR paths are closed.
+ */
+export const DISPLAY = {
+  lab: "quest_openxr_passthrough",
+  product: "waveguide_partner_future",
+  eyeride: false,
+  carplay: false,
+  androidAuto: false,
+} as const;
+
+export const WORLD_FX_MIN_QUALITY = 0.45;
+export const WORLD_FX_MAX_AGE_MS = 400;
