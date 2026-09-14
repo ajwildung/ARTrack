@@ -132,8 +132,6 @@ main().catch((err) => {
   process.exit(1);
 });
 
-});
-
 async function headsetDualPose(
   wsUrl: string,
   kartId: string,
