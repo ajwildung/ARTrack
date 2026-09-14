@@ -46,7 +46,7 @@ export interface Pose3 {
 
 export interface DualPoseSample {
   kartId: string;
-  /** Kart-fixed cam / AprilTag world pose. Required for world FX. */
+  /** Kart-fixed cam / AprilTag world pose (ARCore, ARKit, or generic VIO). Required for world FX. */
   kartWorld: Pose3;
   /** Helmet cam or Quest HMD SLAM look. Optional; falls back to kart heading. */
   look?: Pose3;

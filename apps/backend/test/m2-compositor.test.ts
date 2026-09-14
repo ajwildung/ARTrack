@@ -28,6 +28,57 @@ describe("M2 dual-pose fusion", () => {
     assert.equal(fusion.provider, "stub"); // reports stub until a hardware sample
   });
 
+  it("treats ARCore as a first-class kart world backend (ARKit is an optional iOS peer)", () => {
+    const loc = createLocalization("arcore");
+    assert.ok(loc instanceof DualPoseFusionEngine);
+    const now = Date.now();
+    const fused = loc.ingestDual(
+      {
+        kartId: "SAMSUNG-1",
+        kartWorld: {
+          kartId: "SAMSUNG-1",
+          frame: "track_local",
+          x: 4,
+          y: 0,
+          z: 1,
+          yawRad: 0.1,
+          pitchRad: 0,
+          rollRad: 0,
+          speedMps: 6,
+          provider: "arcore",
+          quality: 0.88,
+          ts: now,
+        },
+        lookSource: "hmd_slam",
+      },
+      now,
+    );
+    assert.equal(fused.worldFxAllowed, true);
+    assert.equal(loc.kart.last.get("SAMSUNG-1")?.provider, "arcore");
+    assert.equal(loc.describe().kartProvider, "arcore");
+    assert.ok(loc.note.includes("ARCore"));
+    assert.ok(loc.note.includes("no iPhone-only"));
+
+    const apple = createLocalization("arkit");
+    assert.ok(apple instanceof DualPoseFusionEngine);
+    apple.ingestKartWorld({
+      kartId: "IOS-1",
+      frame: "track_local",
+      x: 0,
+      y: 0,
+      z: 0,
+      yawRad: 0,
+      pitchRad: 0,
+      rollRad: 0,
+      speedMps: 0,
+      provider: "arkit",
+      quality: 0.9,
+      ts: now,
+    });
+    assert.equal(apple.kart.last.get("IOS-1")?.provider, "arkit");
+    assert.equal(apple.describe().kartProvider, "arkit");
+  });
+
   it("M1 planar ingest still works on the stub engine", () => {
     const loc = new LocalizationStub();
     const pose = loc.ingest({

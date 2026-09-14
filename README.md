@@ -25,7 +25,9 @@ World FX (pads, gates, pickups) require a **healthy kart/world pose**. Look can 
 | Provider | Role |
 | --- | --- |
 | `stub` | Editor / sim. Plug-in still present from M1. |
-| `kart_vio` (+ `apriltag`) | Kart-fixed cam — world / track map |
+| `kart_vio` (+ `apriltag`) | Kart-fixed cam — world / track map (OS-agnostic wrapper) |
+| `arcore` | **First-class** kart world-anchor: Google ARCore on Android / Samsung |
+| `arkit` | Optional iOS peer (Apple-only). Never required; do not hard-code iPhone APIs |
 | `helmet_vio` | Helmet cam look |
 | `hmd_slam` | Quest HMD SLAM look (lab) |
 | `dual_fusion` | KartVio ⊕ look, after a hardware sample |
@@ -42,7 +44,7 @@ RTK/UWB stay demoted. Perfect production SLAM is out of scope — interfaces + l
 | Ops tablet | React PWA | Lobby / Live / Results, headset + world-FX health |
 | Track map | `apps/hud-client` | Desk driver for the M1 loop (WASD) |
 | Lab visor | `apps/quest-compositor` + `clients/quest-openxr` | Shared compositor math; web Editor now, Unity OpenXR on device |
-| Localization | Stub → **dual-pose fusion** | KartVio + HelmetVio/HmdSlam plug-ins |
+| Localization | Stub → **dual-pose fusion** | KartVio (ARCore first-class, ARKit optional) + HelmetVio/HmdSlam |
 
 ## Game rules (unchanged from M1)
 
@@ -118,6 +120,7 @@ Shared defaults (`packages/shared/src/compositor.ts` `DEFAULT_CALIB`):
 - Track_local: X = plan x, Y = up, Z = plan y. Heading 0 looks +X.
 - AprilTag map must be authored in the same meters as `defaultTrack()`.
 - Until `slamOrigin` is locked, Quest HMD SLAM look is applied **relative to the kart seat** (lab). World origin still comes from KartVio.
+- Kart world-anchor phone is **OS-agnostic**. Lab default: **Android / Samsung + Google ARCore**. ARKit is an optional iOS peer — do not hard-code iPhone-only APIs.
 - Do not hard-code RTK/UWB.
 
 ## Smoke test

@@ -46,17 +46,29 @@ export type ForbiddenAssistField = (typeof FORBIDDEN_ASSIST_FIELDS)[number];
 export const LOCALIZATION_PROVIDERS = [
   "stub",
   "kart_vio",
+  "arcore",
+  "arkit",
   "helmet_vio",
   "hmd_slam",
   "apriltag",
   "dual_fusion",
-  "arkit",
   "vio",
   "hybrid",
   "rtk",
   "uwb",
 ] as const;
 export type LocalizationProvider = (typeof LOCALIZATION_PROVIDERS)[number];
+
+/**
+ * Kart world-anchor backends. OS-agnostic: ARCore (Android/Samsung) is first-class.
+ * ARKit is an optional iOS peer (Apple-only) — never required, never the only API.
+ */
+export const KART_WORLD_BACKENDS = ["arcore", "arkit", "kart_vio", "apriltag", "vio"] as const;
+export type KartWorldBackend = (typeof KART_WORLD_BACKENDS)[number];
+
+export function isKartWorldBackend(id: string): id is KartWorldBackend {
+  return (KART_WORLD_BACKENDS as readonly string[]).includes(id);
+}
 
 export const LOOK_SOURCES = ["none", "sim", "helmet_vio", "hmd_slam"] as const;
 export type LookSource = (typeof LOOK_SOURCES)[number];

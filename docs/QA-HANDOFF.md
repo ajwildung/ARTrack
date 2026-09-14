@@ -39,8 +39,10 @@ If any accepted assist row has `canTorqueNm`, `motorOverlay`, `physicalOffset`, 
 2. Drag to look. Pads (cyan discs) and gates (arches) must stay planted on the oval as you look around. Driving WASD moves **you** through the world; FX do not hover on the visor.
 3. Click **Kart pose UNHEALTHY** (or `H`). Expect banner `WORLD FX HIDDEN` and `GET /api/compositor` → `worldFxAllowed: false` for that kart. Pads/gates gone. Look still works.
 4. Restore healthy pose. FX return **registered**, not as a HUD.
-5. Toggle look source `hmd_slam` / `helmet_vio` — still look-only; world origin stays KartVio/stub.
+5. Toggle look source `hmd_slam` / `helmet_vio` — still look-only; world origin stays KartVio/stub (`arcore` or `arkit` when a phone is publishing).
 6. Unity APK path (optional this round): `clients/quest-openxr/README.md`. Same hide rule. Never parent `WorldFxRoot` to the camera.
+
+Kart world-anchor phone may be **Samsung + ARCore**. ARKit is Apple-only and optional. Localization providers must stay OS-agnostic.
 
 ## How to inspect assist telemetry
 

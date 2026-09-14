@@ -42,7 +42,7 @@ World FX stay hidden until `kartWorld.quality ≥ 0.45` and age ≤ 400ms.
 
 | Stream | Provider | Role |
 | --- | --- | --- |
-| Kart-fixed cam + AprilTags | `kart_vio` / `apriltag` | World / track map. **Required** for pads/gates. |
+| Kart-fixed cam + AprilTags | `arcore` (Android/Samsung, first-class), optional `arkit` (iOS), or `kart_vio` / `apriltag` | World / track map. **Required** for pads/gates. OS-agnostic — no iPhone-only APIs. |
 | Helmet cam | `helmet_vio` | Look direction. |
 | Quest HMD SLAM | `hmd_slam` | Look direction in the lab. |
 | None / desk | `stub` + `sim` | Editor. Treated as healthy world pose. |

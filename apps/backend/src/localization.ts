@@ -1,21 +1,26 @@
 import {
   DEFAULT_CALIB,
   fuseDualPose,
+  isKartWorldBackend,
   pose2To3,
   pose3To2,
   type DualPoseSample,
   type FusedLocalization,
   type FusionCalib,
   type LocalizationPublic,
+  type LocalizationProvider,
+  type LookSource,
+  type Pose,
   type Pose3,
 } from "@voltage/shared";
-import type { LocalizationProvider, LookSource, Pose } from "@voltage/shared";
 
 /**
  * Localization plug-in point.
  * M1 shipped `stub` (track-local). M2 adds dual-pose fusion:
  *   KartVio (kart-fixed cam + AprilTags) = world / track map
  *   HelmetVio or Quest HmdSlam           = look direction
+ * Kart world-anchor phone is OS-agnostic: Google ARCore (Android / Samsung) is
+ * first-class; ARKit is an optional iOS peer. Do not hard-code iPhone-only APIs.
  * World FX require a healthy kart/world pose. RTK/UWB stay demoted.
  */
 export interface LocalizationEngine {
@@ -34,20 +39,21 @@ export const LOC_NOTE_STUB =
   "STUB: track-local poses for Editor / sim. Plug KartVio + HelmetVio/HmdSlam via DualPoseFusionEngine.";
 
 export const LOC_NOTE_FUSION =
-  "DUAL FUSION: KartVio (kart-fixed cam + AprilTags) is the world/track map. HelmetVio or Quest HMD SLAM is look. World FX hide unless kart world pose is healthy. RTK/UWB demoted. Lab display is Quest passthrough — not EyeRide.";
+  "DUAL FUSION: KartVio is the world/track map (ARCore on Android/Samsung first-class; ARKit optional iOS peer; AprilTags). HelmetVio or Quest HMD SLAM is look. OS-agnostic — no iPhone-only APIs. World FX hide unless kart world pose is healthy. RTK/UWB demoted. Lab display is Quest passthrough — not EyeRide.";
 
 const STUB_PROVIDERS = new Set<LocalizationProvider>(["stub", "rtk", "uwb"]);
 
-/** Kart-fixed VIO / AprilTag world map. */
+/** Kart-fixed VIO / AprilTag world map. Accepts ARCore, ARKit, generic VIO, or AprilTag samples. */
 export class KartVioProvider {
   readonly id: LocalizationProvider = "kart_vio";
   last = new Map<string, Pose3>();
 
   ingest(pose: Pose3): Pose3 {
+    const backend = isKartWorldBackend(pose.provider) ? pose.provider : pose.provider === "stub" ? "stub" : "kart_vio";
     const normalized: Pose3 = {
       ...pose,
       frame: "track_local",
-      provider: pose.provider === "stub" ? "stub" : pose.provider || "kart_vio",
+      provider: backend,
       ts: pose.ts || Date.now(),
     };
     this.last.set(pose.kartId, normalized);
@@ -159,6 +165,7 @@ export class DualPoseFusionEngine implements LocalizationEngine {
   private planar = new Map<string, Pose>();
   private lookSource = new Map<string, LookSource>();
   private sawHardware = false;
+  private lastKartBackend: LocalizationProvider = "stub";
 
   constructor(calib: FusionCalib = DEFAULT_CALIB) {
     this.calib = calib;
@@ -178,13 +185,17 @@ export class DualPoseFusionEngine implements LocalizationEngine {
     };
     this.planar.set(pose.kartId, normalized);
     this.kart.ingest(pose2To3(normalized));
-    if (normalized.provider !== "stub") this.sawHardware = true;
+    if (normalized.provider !== "stub") {
+      this.sawHardware = true;
+      if (isKartWorldBackend(normalized.provider)) this.lastKartBackend = normalized.provider;
+    }
     return normalized;
   }
 
   ingestKartWorld(pose: Pose3): Pose3 {
     if (pose.provider !== "stub") this.sawHardware = true;
     const stored = this.kart.ingest(pose);
+    if (isKartWorldBackend(stored.provider)) this.lastKartBackend = stored.provider;
     this.planar.set(pose.kartId, pose3To2(stored));
     return stored;
   }
@@ -230,14 +241,18 @@ export class DualPoseFusionEngine implements LocalizationEngine {
       frame: "track_local",
       note: this.note,
       fusion: "dual_pose",
-      kartProvider: this.sawHardware ? "kart_vio" : "stub",
+      kartProvider: isKartWorldBackend(this.lastKartBackend)
+        ? this.lastKartBackend
+        : this.sawHardware
+          ? "kart_vio"
+          : "stub",
       lookProvider: this.sawHardware ? "hmd_slam" : "none",
       worldFxPolicy: "hide_if_kart_world_unhealthy",
     };
   }
 }
 
-/** Factory: stub stays available; anything else (including default) is dual-fusion with stub-compatible ingest. */
+/** Factory: stub stays available; ARCore/ARKit/KartVio/etc. all share DualPoseFusionEngine. No OS-specific native APIs here. */
 export function createLocalization(preferred?: LocalizationProvider): LocalizationEngine {
   if (preferred && STUB_PROVIDERS.has(preferred)) return new LocalizationStub();
   return new DualPoseFusionEngine();
