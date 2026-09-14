@@ -136,3 +136,25 @@ describe("Session + failsafe", () => {
     db.close();
   });
 });
+
+describe("Localization plug-in", () => {
+  it("M1 factory returns stub; ingest stays track_local (ARKit later)", async () => {
+    const { createLocalization } = await import("../src/localization.ts");
+    const loc = createLocalization("arkit");
+    assert.equal(loc.provider, "stub");
+    const pose = loc.ingest({
+      kartId: "K1",
+      frame: "track_local",
+      x: 1,
+      y: 2,
+      headingRad: 0,
+      speedMps: 0,
+      provider: "arkit",
+      quality: 1,
+      ts: Date.now(),
+    });
+    assert.equal(pose.frame, "track_local");
+    assert.ok(loc.note.includes("AprilTags"));
+    assert.ok(loc.note.includes("display-only"));
+  });
+});

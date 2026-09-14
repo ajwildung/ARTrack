@@ -9,6 +9,7 @@ import {
   clampToAsphalt,
   racingPose,
   type KartPublic,
+  type Pose,
   type ResultRow,
   type SessionSnapshot,
   type SessionStatus,
@@ -18,7 +19,7 @@ import type { Db } from "./db.ts";
 import { AssistGateway, type AssistRecord } from "./assist.ts";
 import { EconomyScheduler } from "./economy.ts";
 import { FailSafe } from "./failsafe.ts";
-import { LocalizationStub } from "./localization.ts";
+import { createLocalization, type LocalizationEngine } from "./localization.ts";
 import { Scoring } from "./scoring.ts";
 import { createKart, type KartState } from "./kart.ts";
 
@@ -33,7 +34,7 @@ export class SessionOrchestrator {
   results: ResultRow[] | null = null;
 
   readonly scoring = new Scoring();
-  readonly loc = new LocalizationStub();
+  readonly loc: LocalizationEngine = createLocalization("stub");
   readonly assist: AssistGateway;
   readonly economy: EconomyScheduler;
   readonly failsafe: FailSafe;
@@ -212,7 +213,7 @@ export class SessionOrchestrator {
     k.connected = true;
   }
 
-  applyPose(pose: ReturnType<LocalizationStub["ingest"]>): void {
+  applyPose(pose: Pose): void {
     const k = this.karts.find((x) => x.id === pose.kartId);
     if (!k) return;
     const ingested = this.loc.ingest(pose);

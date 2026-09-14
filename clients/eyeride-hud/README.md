@@ -12,7 +12,7 @@ Outdoor karting needs a visor you can still see the track through. An opaque HMD
 
 - WebSocket: `ws://<track-lan>:8080/ws`
 - Hello: `{ "type": "hello", "role": "hud", "kartId": "HUD-1", "name": "Helmet 1" }`
-- Pose/steer: send `{ "type": "steer", "kartId", "throttle": -1..1, "steer": -1..1 }` at ~20 Hz, **or** `{ "type": "pose", pose }` in `track_local` meters (provider `"stub"` until hybrid RTK+UWB).
+- Pose/steer: send `{ "type": "steer", "kartId", "throttle": -1..1, "steer": -1..1 }` at ~20 Hz, **or** `{ "type": "pose", pose }` in `track_local` meters (`provider: "stub"` in M1; later `"arkit"` / `"vio"` / `"apriltag"`).
 - Consume `snapshot` + `assist` messages. Play VFX from `assist.vfx` only. Ignore/forbid any physical channel.
 
 ## Phase 0 client rules
