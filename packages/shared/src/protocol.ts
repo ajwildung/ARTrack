@@ -85,6 +85,7 @@ export interface SessionSnapshot {
   mode: "sprint_heat";
   physicalAssistEnabled: false;
   actuatorsPresent: false;
+  platform: "ninebot_gokart_pro2";
   status: SessionStatus;
   safeMode: boolean;
   aborted: boolean;
@@ -93,7 +94,7 @@ export interface SessionSnapshot {
   startedAt: number | null;
   endsAt: number | null;
   serverNow: number;
-  localization: { provider: "stub"; frame: "track_local"; note: string };
+  localization: { provider: LocalizationProvider; frame: "track_local"; note: string };
   disabled: readonly string[];
   track: TrackLayout;
   karts: KartPublic[];

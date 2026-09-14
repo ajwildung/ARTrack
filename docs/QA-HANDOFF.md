@@ -24,8 +24,9 @@ You are on the correct build when **all** of these are true:
 1. `/api/health` has `phase: 0`, `physicalAssistEnabled: false`, `localization.provider: "stub"`.
 2. Ops chrome shows **PHASE 0** and **VISUAL ONLY**.
 3. HUD chrome shows **PHASE 0 · VISUAL** and **Optical HUD stub · not an opaque HMD**.
-4. `/api/audit/phase0` returns `"gate": "PASS"` and `"emittedPhysicalOffsets": 0` after a live pad hit.
-5. Disabled list includes `horn_stun`, `vision_blockers`, `portals`, `soft_motor_surge`, `time_attack`.
+4. `/api/health` includes `"platform": "ninebot_gokart_pro2"` and `"actuatorsPresent": false`.
+5. `/api/audit/phase0` returns `"gate": "PASS"` and `"emittedPhysicalOffsets": 0` after a live pad hit.
+6. Disabled list includes `horn_stun`, `vision_blockers`, `portals`, `soft_motor_surge`, `time_attack`.
 
 If any accepted assist row has `canTorqueNm`, `motorOverlay`, `physicalOffset`, or `actuatorPresent: true`, **fail the build**. That is a Phase 0 hard gate, not a warning.
 

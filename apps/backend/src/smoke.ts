@@ -34,6 +34,7 @@ async function main() {
     check("health phase=0", health.phase === 0);
     check("health physicalAssistEnabled=false", health.physicalAssistEnabled === false);
     check("health brand", health.brand === "Voltage League");
+    check("health platform pro2 visual-only", health.platform === "ninebot_gokart_pro2" && health.actuatorsPresent === false);
     check("health localization stub", health.localization?.provider === "stub");
 
     await fetch(`${base}/api/ops/seed_sims`, { method: "POST" });

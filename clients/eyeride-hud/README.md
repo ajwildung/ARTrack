@@ -1,6 +1,6 @@
 # EyeRide-class HUD (Unity + OpenXR) — M1 port notes
 
-M1 ships a **web optical-HUD stub** (`apps/hud-client`) so the Sprint Heat loop is demoable on track LAN without a headset. Production visor target is **see-through** (EyeRide-class / shaded AR glasses), **not** Quest / opaque HMD.
+M1 ships a **web optical-HUD stub** (`apps/hud-client`) so the Sprint Heat loop is demoable on track LAN without a headset. Production visor target is **see-through** (EyeRide-class / shaded AR glasses), **not** Quest / opaque HMD. EyeRide is **display-only**; tracking is intended to come from a kart-fixed iPhone ARKit/VIO + sparse AprilTags provider later (M1 localization is a stub).
 
 This folder is a protocol adapter sketch, not a Unity project (no `Library/`, no Android APK).
 

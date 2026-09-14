@@ -5,7 +5,7 @@ export class LocalizationStub {
   readonly provider: LocalizationProvider = "stub";
   readonly frame = "track_local" as const;
   readonly note =
-    "M1 STUB: poses are track-local. Do not assume GNSS/outdoor. Hybrid RTK+UWB is a later phase.";
+    "M1 STUB: poses are track-local. Later provider can be ARKit/VIO + sparse AprilTags (kart-fixed iPhone); EyeRide is display-only. Do not assume GNSS/outdoor. RTK/UWB is not required for M1.";
 
   last = new Map<string, Pose>();
 

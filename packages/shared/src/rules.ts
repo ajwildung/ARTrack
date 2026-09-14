@@ -42,5 +42,8 @@ export const FORBIDDEN_ASSIST_FIELDS = [
 
 export type ForbiddenAssistField = (typeof FORBIDDEN_ASSIST_FIELDS)[number];
 
-export const LOCALIZATION_PROVIDERS = ["stub", "rtk", "uwb", "hybrid"] as const;
+export const LOCALIZATION_PROVIDERS = ["stub", "arkit", "vio", "apriltag", "hybrid", "rtk", "uwb"] as const;
 export type LocalizationProvider = (typeof LOCALIZATION_PROVIDERS)[number];
+
+/** M1 chassis lock — visual overlay only. No OEM CAN/SDK assist on Pro 2. */
+export const PLATFORM = "ninebot_gokart_pro2" as const;

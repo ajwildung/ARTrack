@@ -8,7 +8,7 @@ Soft-visual pads, pickups, HUD telegraphs, and ops **Start / Abort / Safe Mode**
 
 **Phase 0 hard gate:** `AssistGateway` is visual-only. There are **no** CAN torque, motor overlay, or physical offset commands. Any physical assist field is rejected and audited. Actuators are absent.
 
-Brand placeholder: **Voltage League**.
+Chassis lock for overlay: **Ninebot Gokart Pro 2** (`platform: ninebot_gokart_pro2`). Phase 0 still has `actuatorPresent: false` — no OEM CAN/SDK assist on the Pro 2.
 
 ## Stack
 
@@ -17,7 +17,7 @@ Brand placeholder: **Voltage League**.
 | Backend | TypeScript / Node 22 on track LAN | SessionOrchestrator, EconomyScheduler, Scoring, AssistGateway, FailSafe, SQLite audit |
 | Ops tablet | React PWA | Lobby / Live / Results only, large Start / Abort / Safe Mode |
 | HUD client | Web optical-HUD stub (not Quest) | Helmet / EyeRide-class / shaded AR glasses are see-through. M1 is demoable in a browser overlay with the same protocol a Unity + OpenXR EyeRide client will consume. An opaque HMD is the wrong outdoor/visor form factor. |
-| Localization | **STUB** (`track_local` frame) | Mixed/hybrid RTK+UWB comes later. Nothing is hard-coded outdoor-only. |
+| Localization | **STUB** (`track_local` frame) | Interface accepts `stub` / `arkit` / `vio` / `apriltag` later. M1 is stub only. EyeRide is display-only. Not outdoor-only. |
 
 Future helmet client sketch: [`clients/eyeride-hud/README.md`](clients/eyeride-hud/README.md).
 
