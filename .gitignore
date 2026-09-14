@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+data/
+*.sqlite
+*.sqlite-journal
+.env
+.DS_Store
+*.log
+.vite/
+coverage/
+apps/ops-tablet/dev-dist/
+apps/hud-client/dev-dist/
+.tsx-cache/
