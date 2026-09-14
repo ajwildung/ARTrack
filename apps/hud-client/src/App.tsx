@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import type { AssistRecord, KartPublic, SessionSnapshot } from "@voltage/shared";
 import { insidePad, RULES } from "@voltage/shared";
 import { TrackView } from "./TrackView";
@@ -145,7 +145,59 @@ export default function App() {
       </div>
 
       {assist && assist.telegraph && <div className="toast">{assist.telegraph}</div>}
-      <div className="help">WASD / arrows drive · Q defensive · E pace · predict VFX locally for 100–150ms feel</div>
+      <Pad
+        hold={(k, v) => {
+          keys.current[k] = v;
+        }}
+        use={(slot) => wsRef.current?.send(JSON.stringify({ type: "use_pickup", kartId, slot }))}
+      />
+      <div className="help">Hold THR / steer on visor, or WASD · Q defensive · E pace · local VFX predict</div>
+    </div>
+  );
+}
+
+function Pad({
+  hold,
+  use,
+}: {
+  hold: (k: "up" | "down" | "left" | "right", v: boolean) => void;
+  use: (slot: "defensive" | "pace") => void;
+}) {
+  const bind = (k: "up" | "down" | "left" | "right") => ({
+    onPointerDown: (e: PointerEvent) => {
+      e.preventDefault();
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      hold(k, true);
+    },
+    onPointerUp: () => hold(k, false),
+    onPointerCancel: () => hold(k, false),
+  });
+  return (
+    <div className="pad">
+      <div className="stick">
+        <button type="button" className="pad-btn" {...bind("left")}>
+          ◀
+        </button>
+        <div className="stick-mid">
+          <button type="button" className="pad-btn thr" {...bind("up")}>
+            THR
+          </button>
+          <button type="button" className="pad-btn brk" {...bind("down")}>
+            BRK
+          </button>
+        </div>
+        <button type="button" className="pad-btn" {...bind("right")}>
+          ▶
+        </button>
+      </div>
+      <div className="use-row">
+        <button type="button" className="pad-btn mag" onClick={() => use("defensive")}>
+          DEF
+        </button>
+        <button type="button" className="pad-btn gold" onClick={() => use("pace")}>
+          PACE
+        </button>
+      </div>
     </div>
   );
 }

@@ -76,8 +76,10 @@ export default function App() {
   }
 
   const screen = snap.status;
+  const headline =
+    screen === "results" ? (snap.aborted ? "ABORTED" : "RESULTS") : snap.safeMode ? "SAFE MODE" : screen.toUpperCase();
   return (
-    <div className={`shell status-${screen} ${snap.safeMode ? "safe" : ""}`}>
+    <div className={`shell status-${screen} ${snap.safeMode && screen === "live" ? "safe" : ""}`}>
       <header className="top">
         <div className="brand">
           <span className="bolt" aria-hidden>
@@ -105,7 +107,7 @@ export default function App() {
         </div>
         <div className="state-block">
           <div className="state-label">SESSION</div>
-          <div className="state">{snap.safeMode ? "SAFE MODE" : screen.toUpperCase()}</div>
+          <div className="state">{headline}</div>
           <div className="muted tiny">
             {snap.karts.length} karts · {snap.pads.length} pads · {snap.pickups.length} pickups live · actuators absent
           </div>

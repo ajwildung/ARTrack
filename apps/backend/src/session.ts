@@ -252,10 +252,14 @@ export class SessionOrchestrator {
         k.x = pose.x;
         k.y = pose.y;
         k.headingRad = pose.heading;
-      } else if (k.lastPoseAt && now - k.lastPoseAt < 400) {
-        const accel = k.throttle * 18;
-        k.speedMps = clamp(k.speedMps + accel * dt - Math.sign(k.speedMps) * 3.2 * dt, -4, 22);
-        k.headingRad += k.steer * dt * (1.1 + Math.abs(k.speedMps) * 0.12);
+      } else if (k.lastPoseAt && (now - k.lastPoseAt < 800 || Math.abs(k.speedMps) > 0.05)) {
+        const stale = now - k.lastPoseAt >= 400;
+        const throttle = stale ? 0 : k.throttle;
+        const steer = stale ? 0 : k.steer;
+        const accel = throttle * 28;
+        k.speedMps = clamp(k.speedMps + accel * dt - Math.sign(k.speedMps) * 2.2 * dt, -6, 24);
+        if (Math.abs(throttle) < 0.05 && Math.abs(k.speedMps) < 0.35) k.speedMps = 0;
+        k.headingRad += steer * dt * (1.4 + Math.abs(k.speedMps) * 0.14);
         const nx = k.x + Math.cos(k.headingRad) * k.speedMps * dt;
         const ny = k.y + Math.sin(k.headingRad) * k.speedMps * dt;
         const clamped = clampToAsphalt(track, { x: nx, y: ny });
