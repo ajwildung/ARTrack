@@ -90,5 +90,6 @@ body {
   user-select: none;
 }
 .pad-btn.thr { border-color: #164a55; color: #2ee6ff; }
+.pad-btn.hot { background: #123a44; border-color: #2ee6ff; }
 .pad-btn.mag { border-color: #4a1833; color: #ff3d8a; }
 .pad-btn.gold { border-color: #4a3a12; color: #ffb020; }

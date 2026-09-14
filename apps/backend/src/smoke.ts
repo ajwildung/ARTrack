@@ -5,6 +5,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import WebSocket from "ws";
 import { startVoltageServer } from "./server.ts";
 
 async function main() {
@@ -41,7 +42,12 @@ async function main() {
     check("heat 8:00 default overridden for smoke", started.snapshot.heatDurationMs === 8000);
     check("pads 2-4", started.snapshot.pads.length >= 2 && started.snapshot.pads.length <= 4);
 
+    const driven = await driveKart(base.replace("http", "ws") + "/ws", "SMOKE-HUD");
+    check("hud steer produces motion (no physical assist)", driven.speedMps > 2 && driven.moved);
+
     const kart = server.session.karts[0];
+    kart.surgeUntil = 0;
+    kart.padCooldownUntil = 0;
     const pad = server.session.economy.pads[0];
     kart.x = pad.x;
     kart.y = pad.y;
@@ -114,3 +120,26 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+async function driveKart(wsUrl: string, kartId: string): Promise<{ speedMps: number; moved: boolean }> {
+  const ws = new WebSocket(wsUrl);
+  await new Promise<void>((resolve, reject) => {
+    ws.on("open", () => resolve());
+    ws.on("error", reject);
+  });
+  ws.send(JSON.stringify({ type: "hello", role: "hud", kartId, name: "Smoke HUD" }));
+  await new Promise((r) => setTimeout(r, 120));
+  const iv = setInterval(() => {
+    ws.send(JSON.stringify({ type: "steer", kartId, throttle: 1, steer: 0.15 }));
+  }, 40);
+  await new Promise((r) => setTimeout(r, 900));
+  clearInterval(iv);
+  ws.close();
+  const http = wsUrl.replace("ws", "http").replace(/\/ws$/, "");
+  const snap = await (await fetch(`${http}/api/session`)).json();
+  const me = snap.karts.find((k: { id: string }) => k.id === kartId);
+  return {
+    speedMps: me?.speedMps ?? 0,
+    moved: Boolean(me && (Math.abs(me.x) < 46.4 || me.y !== 0 || me.speedMps > 2)),
+  };
+}

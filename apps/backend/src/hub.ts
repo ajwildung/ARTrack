@@ -91,8 +91,9 @@ export class Hub {
       return;
     }
 
-    if (msg.type === "steer" && client.kartId) {
-      this.session.applySteer(msg.kartId || client.kartId, msg.throttle, msg.steer);
+    if (msg.type === "steer") {
+      const id = msg.kartId || client.kartId;
+      if (id) this.session.applySteer(id, msg.throttle, msg.steer);
       return;
     }
 

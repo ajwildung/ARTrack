@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouse, type PointerEvent } from "react";
 import type { AssistRecord, KartPublic, SessionSnapshot } from "@voltage/shared";
 import { insidePad, RULES } from "@voltage/shared";
 import { TrackView } from "./TrackView";
@@ -148,6 +148,11 @@ export default function App() {
       <Pad
         hold={(k, v) => {
           keys.current[k] = v;
+          const throttle = (keys.current.up ? 1 : 0) + (keys.current.down ? -0.7 : 0);
+          const steer = (keys.current.left ? -1 : 0) + (keys.current.right ? 1 : 0);
+          if (wsRef.current?.readyState === 1) {
+            wsRef.current.send(JSON.stringify({ type: "steer", kartId, throttle, steer }));
+          }
         }}
         use={(slot) => wsRef.current?.send(JSON.stringify({ type: "use_pickup", kartId, slot }))}
       />
@@ -163,30 +168,50 @@ function Pad({
   hold: (k: "up" | "down" | "left" | "right", v: boolean) => void;
   use: (slot: "defensive" | "pace") => void;
 }) {
-  const bind = (k: "up" | "down" | "left" | "right") => ({
-    onPointerDown: (e: PointerEvent) => {
+  const [down, setDown] = useState<Record<string, boolean>>({});
+  const bind = (k: "up" | "down" | "left" | "right") => {
+    const start = (e: PointerEvent | ReactMouse) => {
       e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      e.stopPropagation();
+      setDown((d) => ({ ...d, [k]: true }));
       hold(k, true);
-    },
-    onPointerUp: () => hold(k, false),
-    onPointerCancel: () => hold(k, false),
-  });
+      const el = e.currentTarget as HTMLElement;
+      if ("pointerId" in e) {
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          /* automated browsers may not expose capture */
+        }
+      }
+    };
+    const stop = (e?: PointerEvent | ReactMouse) => {
+      e?.preventDefault();
+      setDown((d) => ({ ...d, [k]: false }));
+      hold(k, false);
+    };
+    return {
+      onPointerDown: start,
+      onPointerUp: stop,
+      onPointerCancel: stop,
+      onLostPointerCapture: () => stop(),
+      onContextMenu: (e: ReactMouse) => e.preventDefault(),
+    };
+  };
   return (
     <div className="pad">
       <div className="stick">
-        <button type="button" className="pad-btn" {...bind("left")}>
+        <button type="button" className={`pad-btn ${down.left ? "hot" : ""}`} {...bind("left")}>
           ◀
         </button>
         <div className="stick-mid">
-          <button type="button" className="pad-btn thr" {...bind("up")}>
+          <button type="button" className={`pad-btn thr ${down.up ? "hot" : ""}`} {...bind("up")}>
             THR
           </button>
-          <button type="button" className="pad-btn brk" {...bind("down")}>
+          <button type="button" className={`pad-btn brk ${down.down ? "hot" : ""}`} {...bind("down")}>
             BRK
           </button>
         </div>
-        <button type="button" className="pad-btn" {...bind("right")}>
+        <button type="button" className={`pad-btn ${down.right ? "hot" : ""}`} {...bind("right")}>
           ▶
         </button>
       </div>
